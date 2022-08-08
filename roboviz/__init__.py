@@ -1,4 +1,8 @@
 '''
+
+This file is a modification of the file below to enable map save
+https://github.com/simondlevy/PyRoboViz/blob/master/roboviz/__init__.py
+
 roboviz.py - Python classes for displaying maps and robots
 
 Requires: numpy, matplotlib
@@ -24,6 +28,7 @@ import matplotlib.cm as colormap
 import matplotlib.lines as mlines
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
+import datetime
 
 # This helps with Raspberry Pi
 import matplotlib
@@ -57,7 +62,10 @@ class Visualizer(object):
         self.bgrbytes = bytearray(map_size_pixels * map_size_pixels * 3)
         
         # Make a nice big (10"x10") figure
-        fig = plt.figure(figsize=(10,10))
+        fig = plt.figure(figsize=(10,10), facecolor="white")
+        fig.set_facecolor("white")
+        # Added this line to make sure the map background is white
+        plt.rcParams['figure.facecolor'] = 'white'
 
         # Store Python ID of figure to detect window close
         self.figid = id(fig)
@@ -75,13 +83,15 @@ class Visualizer(object):
         self.ax = fig.gca()
         self.ax.set_xlabel('X (m)')
         self.ax.set_ylabel('Y (m)')
-        self.ax.grid(False)
+        # self.ax.grid(False)
 
         # Hence we must relabel the axis ticks to show millimeters
         ticks = np.arange(shift,self.map_size_pixels+shift+100,100)
         labels = [str(self.map_scale_meters_per_pixel * tick) for tick in ticks]
         self.ax.set_xticklabels(labels)
         self.ax.set_yticklabels(labels)
+
+        self.ax.set_facecolor('w')
 
         # Store previous position for trajectory
         self.prevpos = None
@@ -93,6 +103,7 @@ class Visualizer(object):
 
         # Set up default shift for centering at origin
         shift = -self.map_size_pixels / 2
+        # print("shift = " + str(shift))
 
         self.zero_angle = zero_angle
         self.start_angle = None
@@ -132,14 +143,15 @@ class Visualizer(object):
  
         s = self.map_scale_meters_per_pixel
 
-        self.vehicle=self.ax.arrow(x_m/s, y_m/s, 
+        self.vehicle=self.ax.arrow(x_m/s, y_m/s,
                 dx, dy, head_width=Visualizer.ROBOT_WIDTH_M/s, 
                 head_length=Visualizer.ROBOT_HEIGHT_M/s, fc='r', ec='r')
 
         # Show trajectory if indicated
         currpos = self._m2pix(x_m,y_m)
         if self.showtraj and not self.prevpos is None:
-            self.ax.add_line(mlines.Line2D((self.prevpos[0],currpos[0]), (self.prevpos[1],currpos[1])))
+            if (self.prevpos[0] != 0 and self.prevpos[1] != 0):
+                self.ax.add_line(mlines.Line2D((self.prevpos[0],currpos[0]), (self.prevpos[1],currpos[1])))
         self.prevpos = currpos
 
     def _refresh(self):                   
@@ -148,8 +160,16 @@ class Visualizer(object):
         if self.figid != id(plt.gcf()):
             return False
 
+        # Added this line to make sure the map background is white
+        plt.rcParams['figure.facecolor'] = 'white'
+        plt.rcParams['axes.facecolor'] = 'white'
+        plt.rcParams['savefig.facecolor'] = 'white'
+
         # Redraw current objects without blocking
         plt.draw()
+        now = datetime.datetime.now()
+        # Create a directory named 'gif' inside the base directory
+        plt.savefig('SLAM/Pictures/slamMap' + '-' + str(now.hour).zfill(2) +  '-' + str(now.minute).zfill(2) + '-' + str(now.second).zfill(2) + '.png')
 
         # Refresh display, setting flag on window close or keyboard interrupt
         try:
@@ -183,11 +203,9 @@ class MapVisualizer(Visualizer):
         plt.pause(.001)
 
         if self.img_artist is None:
-
             self.img_artist = self.ax.imshow(mapimg, cmap=colormap.gray)
 
         else:
-
             self.img_artist.set_data(mapimg)
 
         return self._refresh()
